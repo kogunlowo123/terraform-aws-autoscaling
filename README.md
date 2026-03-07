@@ -2,6 +2,53 @@
 
 Terraform module to create AWS Auto Scaling Groups with support for advanced features including predictive scaling, warm pools, lifecycle hooks, mixed instances policies, instance refresh, scheduled actions, and notifications.
 
+## Architecture Diagram
+
+```mermaid
+flowchart TB
+    subgraph LT["Launch Template"]
+        AMI["AMI / Instance Type"]
+        IAM["IAM Instance Profile"]
+        UD["User Data"]
+    end
+
+    subgraph ASG["Auto Scaling Group"]
+        INSTANCES["EC2 Instances\n(Multi-AZ)"]
+        WARMPOOL["Warm Pool\n(Pre-initialized)"]
+        MIXED["Mixed Instances\n(On-Demand + Spot)"]
+    end
+
+    subgraph Scaling["Scaling Policies"]
+        TT["Target Tracking\n(CPU / Request Count)"]
+        STEP["Step Scaling\n(Alarm Thresholds)"]
+        PRED["Predictive Scaling\n(ML-driven)"]
+        SCHED["Scheduled Actions\n(Time-based)"]
+    end
+
+    subgraph Targets["Load Balancing"]
+        ALB["ALB Target Groups"]
+    end
+
+    subgraph Lifecycle["Lifecycle"]
+        HOOKS["Lifecycle Hooks\n(Launch / Terminate)"]
+        REFRESH["Instance Refresh\n(Rolling Deploy)"]
+        SNS["SNS Notifications"]
+    end
+
+    LT --> ASG
+    ASG --> ALB
+    Scaling --> ASG
+    ASG --> HOOKS
+    ASG --> REFRESH
+    REFRESH --> SNS
+
+    style LT fill:#FF9900,color:#fff
+    style ASG fill:#0078D4,color:#fff
+    style Scaling fill:#3F8624,color:#fff
+    style Targets fill:#DD344C,color:#fff
+    style Lifecycle fill:#8C4FFF,color:#fff
+```
+
 ## Features
 
 - **Launch Template** - Configurable launch template with IAM instance profiles, monitoring, and user data
