@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>terraform-aws-autoscaling — Architecture</title>
+<style>
+:root{--ink:#0b0c0b;--paper:#f5f2eb;--accent:#c8420a;--accent2:#e8720c;--mono:'Courier New',monospace;--sans:system-ui,-apple-system,sans-serif}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--ink);color:var(--paper);font-family:var(--mono);font-size:13px;line-height:1.7;padding:0}
+.container{max-width:1100px;margin:0 auto;padding:32px 48px}
+header{border-bottom:2px solid var(--accent);padding-bottom:24px;margin-bottom:32px}
+h1{font-size:28px;font-family:var(--sans);font-weight:700;letter-spacing:.02em}
+h1 em{font-style:normal;color:var(--accent)}
+.meta{font-size:10px;color:rgba(255,255,255,.4);margin-top:6px;letter-spacing:.05em}
+.badge{display:inline-block;font-size:9px;padding:2px 8px;border-radius:2px;margin-right:4px;letter-spacing:.04em}
+.badge-lang{background:rgba(200,66,10,.2);color:var(--accent);border:1px solid rgba(200,66,10,.4)}
+.badge-cloud{background:rgba(255,255,255,.06);color:rgba(255,255,255,.5);border:1px solid rgba(255,255,255,.1)}
+.badge-cat{background:rgba(232,114,12,.15);color:var(--accent2);border:1px solid rgba(232,114,12,.3)}
+h2{font-size:16px;font-family:var(--sans);color:var(--accent);margin:32px 0 12px;padding-bottom:6px;border-bottom:1px solid rgba(200,66,10,.3);text-transform:uppercase;letter-spacing:.04em}
+h3{font-size:13px;font-family:var(--sans);color:var(--paper);margin:20px 0 8px}
+p,li{font-size:12px;line-height:1.8;color:rgba(255,255,255,.75)}
+ul{padding-left:20px;margin:8px 0}
+.card-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin:16px 0}
+.card{border:1px solid rgba(255,255,255,.1);border-radius:4px;padding:16px;background:rgba(255,255,255,.02)}
+.card-label{font-size:9px;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px}
+.card-value{font-size:14px;font-weight:700;color:var(--paper)}
+.diagram{border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:24px;margin:16px 0;background:rgba(255,255,255,.02);overflow-x:auto}
+.diagram svg{width:100%;height:auto}
+.flow-box{display:inline-block;border:1px solid var(--accent);border-radius:3px;padding:6px 14px;margin:4px;font-size:10px;color:var(--paper);background:rgba(200,66,10,.08)}
+.flow-arrow{color:var(--accent);margin:0 8px;font-size:14px}
+.checklist{list-style:none;padding:0}
+.checklist li{padding:4px 0;font-size:11px}
+.checklist li::before{content:'&#10003; ';color:var(--accent);font-weight:bold}
+table{width:100%;border-collapse:collapse;margin:12px 0;font-size:11px}
+th{text-align:left;padding:8px;border-bottom:2px solid var(--accent);color:var(--accent);font-size:10px;text-transform:uppercase;letter-spacing:.04em}
+td{padding:8px;border-bottom:1px solid rgba(255,255,255,.06);color:rgba(255,255,255,.7)}
+footer{margin-top:48px;padding-top:16px;border-top:2px solid var(--accent);font-size:9px;color:rgba(255,255,255,.3)}
+footer a{color:var(--accent);text-decoration:none}
+@media print{body{background:#fff;color:#000}h2{color:#c8420a}.card{border-color:#ccc}}
+@media(max-width:768px){.container{padding:16px}.card-grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="container">
+<header>
+  <h1>terraform-aws-autoscaling <em>Architecture</em></h1>
+  <div class="meta">
+    <span class="badge badge-lang">HCL / Terraform</span>
+    <span class="badge badge-cloud">AWS</span>
+    <span class="badge badge-cat">Infrastructure / IaC</span>
+  </div>
+</header>
+
+<!-- 1. Executive Summary -->
+<h2>Executive Summary</h2>
+<p>
+  This module provisions AWS Auto Scaling Groups with launch templates and comprehensive scaling capabilities including target tracking, step scaling, predictive (ML-driven) scaling, warm pools, mixed instances policies (on-demand/spot), lifecycle hooks, instance refresh for rolling deployments, scheduled actions, and SNS notifications. It enables organizations to automatically right-size compute capacity, reduce costs through spot integration, and achieve zero-downtime deployments with rolling updates and auto-rollback.
+</p>
+
+<!-- 2. Overview Cards -->
+<h2>Overview</h2>
+<div class="card-grid">
+  <div class="card">
+    <div class="card-label">Resources Created</div>
+    <div class="card-value">5</div>
+  </div>
+  <div class="card">
+    <div class="card-label">Variables Count</div>
+    <div class="card-value">22</div>
+  </div>
+  <div class="card">
+    <div class="card-label">Outputs Count</div>
+    <div class="card-value">12</div>
+  </div>
+  <div class="card">
+    <div class="card-label">Provider</div>
+    <div class="card-value">hashicorp/aws</div>
+  </div>
+  <div class="card">
+    <div class="card-label">Terraform Version</div>
+    <div class="card-value">&gt;= 1.5.0</div>
+  </div>
+</div>
+
+<!-- 3. Architecture Diagram -->
+<h2>Architecture Diagram</h2>
+<div class="diagram">
+  <div style="text-align:center">
+    <span class="flow-box">Launch Template (AMI, Instance Type, IAM, User Data)</span>
+    <span class="flow-arrow">&rarr;</span>
+    <span class="flow-box">Auto Scaling Group</span>
+    <br/><br/>
+    <span class="flow-box">ASG</span>
+    <span class="flow-arrow">&rarr;</span>
+    <span class="flow-box">EC2 Instances (Multi-AZ)</span>
+    <span class="flow-arrow">&rarr;</span>
+    <span class="flow-box">ALB Target Groups</span>
+    <br/><br/>
+    <span class="flow-box">Mixed Instances Policy</span>
+    <span class="flow-arrow">&rarr;</span>
+    <span class="flow-box">On-Demand Instances</span>
+    &nbsp;&nbsp;
+    <span class="flow-box">Mixed Instances Policy</span>
+    <span class="flow-arrow">&rarr;</span>
+    <span class="flow-box">Spot Instances</span>
+    <br/><br/>
+    <span class="flow-box">Target Tracking</span>
+    <span class="flow-arrow">&rarr;</span>
+    <span class="flow-box">ASG</span>
+    &nbsp;&nbsp;
+    <span class="flow-box">Step Scaling</span>
+    <span class="flow-arrow">&rarr;</span>
+    <span class="flow-box">ASG</span>
+    &nbsp;&nbsp;
+    <span class="flow-box">Predictive Scaling (ML)</span>
+    <span class="flow-arrow">&rarr;</span>
+    <span class="flow-box">ASG</span>
+    <br/><br/>
+    <span class="flow-box">Warm Pool</span>
+    <span class="flow-arrow">&rarr;</span>
+    <span class="flow-box">Pre-initialized Instances</span>
+    &nbsp;&nbsp;
+    <span class="flow-box">Lifecycle Hooks</span>
+    <span class="flow-arrow">&rarr;</span>
+    <span class="flow-box">SNS Notifications</span>
+    <br/><br/>
+    <span class="flow-box">Instance Refresh</span>
+    <span class="flow-arrow">&rarr;</span>
+    <span class="flow-box">Rolling Deploy</span>
+    &nbsp;&nbsp;
+    <span class="flow-box">Scheduled Actions</span>
+    <span class="flow-arrow">&rarr;</span>
+    <span class="flow-box">Time-based Scaling</span>
+  </div>
+</div>
+
+<!-- 4. Component Breakdown -->
+<h2>Component Breakdown</h2>
+<table>
+  <thead>
+    <tr><th>Resource</th><th>Type</th><th>Purpose</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>aws_launch_template.this</td><td>Launch Template</td><td>Defines AMI, instance type, IAM profile, monitoring, user data, and tag specs</td></tr>
+    <tr><td>aws_autoscaling_group.this</td><td>Auto Scaling Group</td><td>Manages fleet of EC2 instances across AZs with health checks and target group registration</td></tr>
+    <tr><td>aws_autoscaling_policy.this</td><td>Scaling Policy</td><td>Target tracking, step, and predictive scaling policies for automatic capacity adjustment</td></tr>
+    <tr><td>aws_autoscaling_lifecycle_hook.this</td><td>Lifecycle Hook</td><td>Custom actions on instance launch/termination (e.g., drain connections, register DNS)</td></tr>
+    <tr><td>aws_autoscaling_schedule.this</td><td>Scheduled Action</td><td>Time-based scaling for predictable traffic patterns (cron schedules)</td></tr>
+    <tr><td>aws_autoscaling_notification.this</td><td>SNS Notification</td><td>Alerts for launch, termination, and error events via SNS topic</td></tr>
+  </tbody>
+</table>
+
+<!-- 5. Data Flow -->
+<h2>Data Flow</h2>
+<ol>
+  <li>The Launch Template defines the instance blueprint: AMI, instance type, IAM role, user data, security groups, and monitoring settings.</li>
+  <li>The Auto Scaling Group uses the template to launch EC2 instances across configured subnets (multi-AZ).</li>
+  <li>When mixed instances policy is configured, the ASG allocates a base of on-demand instances and fills remaining capacity with spot instances using the specified allocation strategy.</li>
+  <li>Scaling policies monitor CloudWatch metrics and adjust the desired capacity: target tracking maintains a metric target (e.g., 50% CPU), step scaling applies graduated adjustments, and predictive scaling uses ML to forecast demand.</li>
+  <li>Warm pool maintains pre-initialized instances in Stopped or Hibernated state for rapid scale-out.</li>
+  <li>Instances register with ALB target groups, and the health check type (EC2 or ELB) determines instance health.</li>
+  <li>Lifecycle hooks pause instance transitions, allowing custom scripts (via Lambda/SSM/SNS) to run before launch or termination completes.</li>
+  <li>Instance refresh performs rolling deployments, replacing instances in batches while maintaining a minimum healthy percentage, with optional auto-rollback.</li>
+  <li>SNS notifications alert on launch, termination, and error events for operational visibility.</li>
+</ol>
+
+<!-- 6. Security Controls -->
+<h2>Security Controls</h2>
+<ul>
+  <li><strong>IAM Instance Profiles</strong> &mdash; Configurable IAM role attachment for least-privilege EC2 access.</li>
+  <li><strong>Security Groups</strong> &mdash; Network-level access control via security group associations.</li>
+  <li><strong>Detailed Monitoring</strong> &mdash; Enabled by default for 1-minute CloudWatch metrics.</li>
+  <li><strong>Tag Propagation</strong> &mdash; Tags propagated to instances and volumes for cost allocation and compliance.</li>
+  <li><strong>Create-Before-Destroy</strong> &mdash; Lifecycle policy ensures zero-downtime during template updates.</li>
+  <li><strong>Instance Maintenance Policy</strong> &mdash; Controls min/max healthy percentages during maintenance operations.</li>
+  <li><strong>Auto-Rollback</strong> &mdash; Instance refresh can automatically rollback failed deployments.</li>
+  <li><strong>Scale-In Protection</strong> &mdash; Configurable protection for instances during instance refresh.</li>
+</ul>
+
+<!-- 7. Industry Adaptation -->
+<h2>Industry Adaptation</h2>
+<table>
+  <thead>
+    <tr><th>Industry</th><th>Use Case</th><th>Key Features Leveraged</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>Healthcare</td><td>HIPAA-compliant EHR application servers</td><td>IAM profiles, ELB health checks, detailed monitoring, tag compliance</td></tr>
+    <tr><td>Finance</td><td>Trading platform with predictable peak hours</td><td>Predictive scaling, scheduled actions, warm pool, mixed instances</td></tr>
+    <tr><td>Government</td><td>Citizen portal with elastic capacity</td><td>Target tracking, lifecycle hooks, SNS notifications, multi-AZ</td></tr>
+    <tr><td>Retail</td><td>E-commerce with holiday traffic spikes</td><td>Spot instances, warm pool, predictive scaling, step scaling</td></tr>
+    <tr><td>SaaS</td><td>Multi-tenant platform with rolling deploys</td><td>Instance refresh, auto-rollback, mixed instances, lifecycle hooks</td></tr>
+  </tbody>
+</table>
+
+<!-- 8. Production Readiness Checklist -->
+<h2>Production Readiness Checklist</h2>
+<ul class="checklist">
+  <li>Set <code>health_check_type = "ELB"</code> when using ALB target groups</li>
+  <li>Configure an appropriate <code>health_check_grace_period</code> for application startup time</li>
+  <li>Enable detailed monitoring (<code>enable_monitoring = true</code>, default)</li>
+  <li>Attach an IAM instance profile with least-privilege permissions</li>
+  <li>Use mixed instances policy for cost optimization with spot instances</li>
+  <li>Configure warm pool for latency-sensitive scale-out scenarios</li>
+  <li>Set up instance refresh with auto-rollback for safe deployments</li>
+  <li>Configure lifecycle hooks for graceful drain/registration</li>
+  <li>Set up SNS notifications for operational alerting</li>
+  <li>Deploy across multiple subnets in different AZs for high availability</li>
+  <li>Enable predictive scaling for workloads with recurring traffic patterns</li>
+  <li>Configure <code>instance_maintenance_policy</code> to control update behavior</li>
+</ul>
+
+<!-- 9. Configuration Reference -->
+<h2>Configuration Reference</h2>
+<table>
+  <thead>
+    <tr><th>Variable</th><th>Type</th><th>Description</th><th>Default</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>name</td><td>string</td><td>Name for the ASG and related resources</td><td><em>required</em></td></tr>
+    <tr><td>vpc_id</td><td>string</td><td>ID of the VPC for deployment</td><td><em>required</em></td></tr>
+    <tr><td>subnet_ids</td><td>list(string)</td><td>List of subnet IDs to launch resources in</td><td><em>required</em></td></tr>
+    <tr><td>image_id</td><td>string</td><td>AMI ID for the launch template</td><td><em>required</em></td></tr>
+    <tr><td>instance_type</td><td>string</td><td>EC2 instance type</td><td>"t3.medium"</td></tr>
+    <tr><td>min_size</td><td>number</td><td>Minimum ASG size</td><td>1</td></tr>
+    <tr><td>max_size</td><td>number</td><td>Maximum ASG size</td><td>3</td></tr>
+    <tr><td>desired_capacity</td><td>number</td><td>Desired instance count</td><td>null</td></tr>
+    <tr><td>health_check_type</td><td>string</td><td>Health check type: EC2 or ELB</td><td>"EC2"</td></tr>
+    <tr><td>target_group_arns</td><td>list(string)</td><td>ALB target group ARNs</td><td>[]</td></tr>
+    <tr><td>mixed_instances_policy</td><td>object</td><td>On-demand/spot allocation and instance overrides</td><td>null</td></tr>
+    <tr><td>warm_pool</td><td>object</td><td>Warm pool configuration (pool state, min size)</td><td>null</td></tr>
+    <tr><td>instance_refresh</td><td>object</td><td>Rolling deployment configuration with auto-rollback</td><td>null</td></tr>
+    <tr><td>scaling_policies</td><td>list(object)</td><td>Target tracking, step, and predictive scaling policies</td><td>[]</td></tr>
+    <tr><td>lifecycle_hooks</td><td>list(object)</td><td>Launch/terminate lifecycle hooks</td><td>[]</td></tr>
+    <tr><td>scheduled_actions</td><td>list(object)</td><td>Time-based scaling actions</td><td>[]</td></tr>
+    <tr><td>notification_topic_arn</td><td>string</td><td>SNS topic ARN for ASG notifications</td><td>null</td></tr>
+    <tr><td>tags</td><td>map(string)</td><td>Tags to apply to all resources</td><td>{}</td></tr>
+  </tbody>
+</table>
+
+<!-- 10. Deployment -->
+<h2>Deployment</h2>
+<h3>Quick Start</h3>
+<pre style="background:rgba(255,255,255,.04);padding:16px;border-radius:4px;overflow-x:auto;color:rgba(255,255,255,.7);font-size:11px">
+module "autoscaling" {
+  source = "github.com/kogunlowo123/terraform-aws-autoscaling"
+
+  name       = "my-asg"
+  vpc_id     = "vpc-0123456789abcdef0"
+  subnet_ids = ["subnet-abc123", "subnet-def456"]
+
+  image_id      = "ami-0123456789abcdef0"
+  instance_type = "t3.micro"
+
+  min_size         = 1
+  max_size         = 3
+  desired_capacity = 2
+}
+</pre>
+<h3>Commands</h3>
+<pre style="background:rgba(255,255,255,.04);padding:16px;border-radius:4px;overflow-x:auto;color:rgba(255,255,255,.7);font-size:11px">
+terraform init      # Initialize providers and modules
+terraform plan      # Preview infrastructure changes
+terraform apply     # Deploy the Auto Scaling infrastructure
+terraform destroy   # Tear down all resources
+</pre>
+
+<!-- 11. Links -->
+<h2>Links</h2>
+<ul>
+  <li><a href="https://github.com/kogunlowo123/terraform-aws-autoscaling" style="color:var(--accent)">GitHub Repository</a></li>
+  <li><a href="https://github.com/kogunlowo123/terraform-aws-autoscaling/blob/main/README.md" style="color:var(--accent)">README</a></li>
+  <li><a href="https://github.com/kogunlowo123/terraform-aws-autoscaling/tree/main/examples" style="color:var(--accent)">Examples</a></li>
+  <li><a href="https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/autoscaling_group" style="color:var(--accent)">AWS Provider: aws_autoscaling_group</a></li>
+</ul>
+
+<footer>
+  <a href="https://github.com/kogunlowo123/terraform-aws-autoscaling">terraform-aws-autoscaling</a> &middot; Generated 2026-03-15 &middot; Kehinde Ogunlowo
+</footer>
+</div>
+</body>
+</html>
