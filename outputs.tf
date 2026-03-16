@@ -1,7 +1,3 @@
-################################################################################
-# Launch Template
-################################################################################
-
 output "launch_template_id" {
   description = "The ID of the launch template"
   value       = aws_launch_template.this.id
@@ -16,10 +12,6 @@ output "launch_template_latest_version" {
   description = "The latest version of the launch template"
   value       = aws_launch_template.this.latest_version
 }
-
-################################################################################
-# Auto Scaling Group
-################################################################################
 
 output "autoscaling_group_id" {
   description = "The ID of the Auto Scaling Group"
@@ -47,7 +39,7 @@ output "autoscaling_group_max_size" {
 }
 
 output "autoscaling_group_desired_capacity" {
-  description = "The number of EC2 instances that should be running in the group"
+  description = "The number of EC2 instances that should be running"
   value       = aws_autoscaling_group.this.desired_capacity
 }
 
@@ -61,27 +53,15 @@ output "autoscaling_group_availability_zones" {
   value       = aws_autoscaling_group.this.availability_zones
 }
 
-################################################################################
-# Scaling Policies
-################################################################################
-
 output "scaling_policy_arns" {
   description = "Map of scaling policy names to their ARNs"
   value       = { for k, v in aws_autoscaling_policy.this : k => v.arn }
 }
 
-################################################################################
-# Lifecycle Hooks
-################################################################################
-
 output "lifecycle_hook_names" {
   description = "List of lifecycle hook names"
   value       = [for k, v in aws_autoscaling_lifecycle_hook.this : v.name]
 }
-
-################################################################################
-# Scheduled Actions
-################################################################################
 
 output "scheduled_action_arns" {
   description = "Map of scheduled action names to their ARNs"

@@ -3,7 +3,7 @@
 ################################################################################
 
 resource "aws_launch_template" "this" {
-  name_prefix   = "${local.name}-"
+  name_prefix   = "${var.name}-"
   image_id      = var.image_id
   instance_type = var.instance_type
   key_name      = var.key_name
@@ -29,15 +29,15 @@ resource "aws_launch_template" "this" {
 
   tag_specifications {
     resource_type = "instance"
-    tags          = local.tags
+    tags          = merge(var.tags, { Name = var.name })
   }
 
   tag_specifications {
     resource_type = "volume"
-    tags          = local.tags
+    tags          = merge(var.tags, { Name = var.name })
   }
 
-  tags = local.tags
+  tags = merge(var.tags, { Name = var.name })
 
   lifecycle {
     create_before_destroy = true
@@ -49,7 +49,7 @@ resource "aws_launch_template" "this" {
 ################################################################################
 
 resource "aws_autoscaling_group" "this" {
-  name                      = local.name
+  name                      = var.name
   min_size                  = var.min_size
   max_size                  = var.max_size
   desired_capacity          = var.desired_capacity
@@ -58,18 +58,16 @@ resource "aws_autoscaling_group" "this" {
   health_check_grace_period = var.health_check_grace_period
   target_group_arns         = var.target_group_arns
 
-  # When not using mixed instances policy, use a simple launch template reference
   dynamic "launch_template" {
-    for_each = local.use_mixed_instances_policy ? [] : [1]
+    for_each = var.mixed_instances_policy == null ? [1] : []
     content {
       id      = aws_launch_template.this.id
       version = "$Latest"
     }
   }
 
-  # Mixed Instances Policy
   dynamic "mixed_instances_policy" {
-    for_each = local.use_mixed_instances_policy ? [var.mixed_instances_policy] : []
+    for_each = var.mixed_instances_policy != null ? [var.mixed_instances_policy] : []
     content {
       launch_template {
         launch_template_specification {
@@ -100,7 +98,6 @@ resource "aws_autoscaling_group" "this" {
     }
   }
 
-  # Warm Pool
   dynamic "warm_pool" {
     for_each = var.warm_pool != null ? [var.warm_pool] : []
     content {
@@ -110,7 +107,6 @@ resource "aws_autoscaling_group" "this" {
     }
   }
 
-  # Instance Refresh
   dynamic "instance_refresh" {
     for_each = var.instance_refresh != null ? [var.instance_refresh] : []
     content {
@@ -133,7 +129,6 @@ resource "aws_autoscaling_group" "this" {
     }
   }
 
-  # Instance Maintenance Policy
   dynamic "instance_maintenance_policy" {
     for_each = var.instance_maintenance_policy != null ? [var.instance_maintenance_policy] : []
     content {
@@ -143,7 +138,13 @@ resource "aws_autoscaling_group" "this" {
   }
 
   dynamic "tag" {
-    for_each = local.asg_tags
+    for_each = [
+      for key, value in merge(var.tags, { Name = var.name }) : {
+        key                 = key
+        value               = value
+        propagate_at_launch = var.propagate_tags_at_launch
+      }
+    ]
     content {
       key                 = tag.value.key
       value               = tag.value.value
@@ -162,7 +163,7 @@ resource "aws_autoscaling_group" "this" {
 ################################################################################
 
 resource "aws_autoscaling_policy" "this" {
-  for_each = local.scaling_policies_map
+  for_each = { for policy in var.scaling_policies : policy.name => policy }
 
   name                      = each.value.name
   autoscaling_group_name    = aws_autoscaling_group.this.name
@@ -170,7 +171,6 @@ resource "aws_autoscaling_policy" "this" {
   estimated_instance_warmup = each.value.estimated_instance_warmup
   adjustment_type           = each.value.policy_type == "StepScaling" ? each.value.step.adjustment_type : each.value.adjustment_type
 
-  # Target Tracking Scaling
   dynamic "target_tracking_configuration" {
     for_each = each.value.policy_type == "TargetTrackingScaling" && each.value.target_tracking != null ? [each.value.target_tracking] : []
     content {
@@ -205,7 +205,6 @@ resource "aws_autoscaling_policy" "this" {
     }
   }
 
-  # Step Scaling
   dynamic "step_adjustment" {
     for_each = each.value.policy_type == "StepScaling" && each.value.step != null ? each.value.step.step_adjustments : []
     content {
@@ -215,14 +214,13 @@ resource "aws_autoscaling_policy" "this" {
     }
   }
 
-  # Predictive Scaling
   dynamic "predictive_scaling_configuration" {
     for_each = each.value.policy_type == "PredictiveScaling" && each.value.predictive != null ? [each.value.predictive] : []
     content {
-      mode                          = predictive_scaling_configuration.value.mode
-      scheduling_buffer_time        = predictive_scaling_configuration.value.scheduling_buffer_time
-      max_capacity_breach_behavior  = predictive_scaling_configuration.value.max_capacity_breach_behavior
-      max_capacity_buffer           = predictive_scaling_configuration.value.max_capacity_buffer
+      mode                         = predictive_scaling_configuration.value.mode
+      scheduling_buffer_time       = predictive_scaling_configuration.value.scheduling_buffer_time
+      max_capacity_breach_behavior = predictive_scaling_configuration.value.max_capacity_breach_behavior
+      max_capacity_buffer          = predictive_scaling_configuration.value.max_capacity_buffer
 
       metric_specification {
         target_value = predictive_scaling_configuration.value.metric_specification.target_value
@@ -360,7 +358,7 @@ resource "aws_autoscaling_policy" "this" {
 ################################################################################
 
 resource "aws_autoscaling_lifecycle_hook" "this" {
-  for_each = local.lifecycle_hooks_map
+  for_each = { for hook in var.lifecycle_hooks : hook.name => hook }
 
   name                    = each.value.name
   autoscaling_group_name  = aws_autoscaling_group.this.name
@@ -377,7 +375,7 @@ resource "aws_autoscaling_lifecycle_hook" "this" {
 ################################################################################
 
 resource "aws_autoscaling_schedule" "this" {
-  for_each = local.scheduled_actions_map
+  for_each = { for action in var.scheduled_actions : action.name => action }
 
   scheduled_action_name  = each.value.name
   autoscaling_group_name = aws_autoscaling_group.this.name
