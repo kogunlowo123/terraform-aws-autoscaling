@@ -18,7 +18,7 @@ module "autoscaling" {
   user_data                = base64encode("#!/bin/bash\necho 'Hello World'")
 
   min_size         = 3
-  max_size          = 20
+  max_size         = 20
   desired_capacity = 6
 
   health_check_type         = "ELB"

@@ -13,7 +13,7 @@ module "autoscaling" {
   instance_type = "t3.medium"
 
   min_size         = 2
-  max_size          = 10
+  max_size         = 10
   desired_capacity = 4
 
   health_check_type         = "ELB"
